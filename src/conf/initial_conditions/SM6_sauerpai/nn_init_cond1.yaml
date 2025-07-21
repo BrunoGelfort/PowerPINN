@@ -1,0 +1,7 @@
+- {name: delta, range: [-6, 4], iterations: 10}
+- {name: omega, range: [0.99, 1.01], iterations: 10}
+- {name: e_q, range: [1, 1.8], iterations: 4}
+- {name: e_d, range: [0.2, 1], iterations: 5}
+- {name: psi__d, range: [0.5, 1.5], iterations: 1}
+- {name: psi__q, range: [-0.6, -0.2], iterations: 1}
+- {name: vf, range: [0.8, 2.4], iterations: 1}

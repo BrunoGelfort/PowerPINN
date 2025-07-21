@@ -187,7 +187,7 @@ class ODE_modelling():
             #wandb.log({"Number of different initial conditions for collocation points: ": number_of_conditions})
         else:
             print("Number of different initial conditions: ", number_of_conditions)
-            wandb.log({"Number of different initial conditions: ": number_of_conditions})
+            #wandb.log({"Number of different initial conditions: ": number_of_conditions})
 
         print(variables, "Variables")
         print(set_of_values,"Set of values for init conditions")
@@ -276,7 +276,7 @@ class ODE_modelling():
         num_files = len([f for f in os.listdir(os.path.join(self.dataset_dir, self.model_flag)) if os.path.isfile(os.path.join(self.dataset_dir, self.model_flag, f))])
         print("Number of files in the directory: ", num_files)
         print(f'Saved dataset "{self.model_flag, "dataset_v" + str(num_files + 1)}".')
-        wandb.log({"Dataset saved": f'Saved dataset "{self.model_flag, "dataset_v" + str(num_files + 1)}".'})
+        #wandb.log({"Dataset saved": f'Saved dataset "{self.model_flag, "dataset_v" + str(num_files + 1)}".'})
         # save the dataset as pickle in the dataset directory
         dataset_path = os.path.join(self.dataset_dir, self.model_flag, "dataset_v" + str(num_files + 1) + ".pkl")
         with open(dataset_path, 'wb') as f:

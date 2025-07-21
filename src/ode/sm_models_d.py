@@ -38,6 +38,8 @@ class SynchronousMachineModels():
         """
         machine_params_path = os.path.join(self.params_dir, "machine" + str(self.machine_num) + ".yaml") # path to the selected machine parameters
         machine_params = OmegaConf.load(machine_params_path)
+        
+        
         if not(self.model_flag=="SM_IB"):
             for param in ['X_d_dash', 'X_q_dash', 'H', 'D', 'T_d_dash', 'X_d', 'T_q_dash', 'X_q', 'E_fd', 'P_m']:
                 setattr(self, param, getattr(machine_params, param))

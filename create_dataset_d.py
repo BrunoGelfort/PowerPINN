@@ -16,9 +16,9 @@ os.environ["HYDRA_FULL_ERROR"]="1"
 def main(config):
 
     # Initialize wandb and log the dataset creation
-    run = wandb.init(project=config.wandb.project)
-    log_data_metrics_to_wandb(run, config)
-    print("Is cuda available?", torch.cuda.is_available())
+    #run = wandb.init(project=config.wandb.project)
+    #log_data_metrics_to_wandb(run, config)
+    #print("Is cuda available?", torch.cuda.is_available())
 
     SM_model=ODE_modelling(config) # Create an instance of the class ODE_modelling that creates the initial conditions and generates the dataset
     init_conditions=SM_model.create_init_conditions_set3() # Define the initial conditions of the system
@@ -30,4 +30,9 @@ def main(config):
 
 if __name__ == "__main__":
     main()
-
+    
+    
+    
+    
+    
+    
