@@ -1,3 +1,10 @@
+import os 
+
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
+
+
+os.environ["HYDRA_FULL_ERROR"]="1"
+
 from src.functions import *
 import torch
 import wandb
@@ -5,10 +12,6 @@ import hydra
 from src.dataset.create_dataset_functions import ODE_modelling
 from src.ode.sm_models_d import SynchronousMachineModels
 import os
-os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
-
-
-os.environ["HYDRA_FULL_ERROR"]="1"
 
 
 # Use hydra to configure the dataset creation along with the setup_dataset.yaml file

@@ -1,4 +1,8 @@
 import os
+
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
+os.environ["HYDRA_FULL_ERROR"]="1"
+
 from src.ode.sm_models_d import SynchronousMachineModels
 from src.nn.nn_actions import NeuralNetworkActions
 from src.functions import *

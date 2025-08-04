@@ -8,6 +8,8 @@ from pyDOE import lhs
 from scipy.integrate import solve_ivp
 import time
 
+#import matplotlib.pyplot as plt
+
 class ODE_modelling():
     def __init__(self, config):
         """
@@ -238,6 +240,33 @@ class ODE_modelling():
             time_list = [] 
         for i in range(len(init_conditions)):
             solution = self.solve(init_conditions[i], self.modelling_method, modelling_full)
+            
+            '''
+            # Create a 3x3 grid of subplots
+            fig, axes = plt.subplots(3, 3, figsize=(12, 10))
+            axes = axes.flatten()  # Flatten to easily iterate over
+            
+            # dictionary of parameters
+            params = ["e_q", "e_d", "psi__d", "psi__q", "omega", "delta",
+                      "vf", "vinfty", "Xline"]
+            
+            # Plot each y[i] in its own subplot
+            for i, y_i in enumerate(solution.y):
+                ax = axes[i]
+                ax.plot(solution.t, y_i)
+                ax.set_title(f'Plot of {params[i]}')
+                ax.set_xlabel('t')
+                ax.set_ylabel(f'y[{i}]')
+                ax.grid(True)
+            
+            # Hide any unused subplots (if there are fewer than 9)
+            for j in range(len(solution.y), len(axes)):
+                fig.delaxes(axes[j])
+            
+            fig.tight_layout()
+            plt.show()
+            '''
+            
             solution_all.append(solution)
             if flag_time:
                 end_per_iteration = time.time()

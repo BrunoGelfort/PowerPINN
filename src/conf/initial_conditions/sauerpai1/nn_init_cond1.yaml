@@ -1,0 +1,9 @@
+- {name: delta, range: [-1.05, -0.9], iterations: 5} # was 10
+- {name: omega, range: [0.995, 1.005], iterations: 3} # was 5
+- {name: e_q, range: [1, 1.8], iterations: 2} # was 4
+- {name: e_d, range: [0.2, 1], iterations: 2}  # was 5
+- {name: psi__d, range: [0.5, 1.5], iterations: 3}
+- {name: psi__q, range: [-0.6, -0.2], iterations: 2} # was 3
+- {name: vf, range: [0.8, 2.4], iterations: 3} # was 4
+- {name: vinfty, range: [1.027, 1.033], iterations: 3} # was4
+- {name: Xline, range: [0.08, 0.2], iterations: 2} # was 4

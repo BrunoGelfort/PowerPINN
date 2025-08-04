@@ -26,8 +26,8 @@ class SynchronousMachineModels():
         self.model_flag = config.model.model_flag # the model to be used
         self.define_machine_params() # define the parameters of the machine based on the machine_num
         self.define_system_params() # define the parameters of the power system
-          
-
+        
+        
     def define_machine_params(self):
         """
         Define the parameters of the synchronous machine based on the machine_num
@@ -38,8 +38,12 @@ class SynchronousMachineModels():
         """
         machine_params_path = os.path.join(self.params_dir, "machine" + str(self.machine_num) + ".yaml") # path to the selected machine parameters
         machine_params = OmegaConf.load(machine_params_path)
-        
-        
+
+        if self.model_flag == "sauerpai1":
+            for param in ["D", "H", "P_m", "Ra", "Xl", "Xd", "X_d", "X__d", "Xq", "X_q", "X__q", "T_d0", "T__d0", "T_q0", "T__q0", "KA"]:
+                setattr(self, param, getattr(machine_params, param))
+            return
+
         if not(self.model_flag=="SM_IB"):
             for param in ['X_d_dash', 'X_q_dash', 'H', 'D', 'T_d_dash', 'X_d', 'T_q_dash', 'X_q', 'E_fd', 'P_m']:
                 setattr(self, param, getattr(machine_params, param))
@@ -67,7 +71,12 @@ class SynchronousMachineModels():
                 setattr(self, param, getattr(gov_params, param))
         else:
             gov_params=None
-
+                
+        #if self.model_implementation == "yes":
+        #    for param in ["D", "H", "P_m", "Ra", "Xd", "X_d", "X__d", "Xq", "X_q", "X__q", "T_d0", "T__d0", "T_q0", "T__q0", "KA"]:
+        #        setattr(self, param, getattr(machine_params, param))
+        #        # Or maybe just change the names of my params
+                
         return 
     
     def define_system_params(self):
@@ -136,7 +145,8 @@ class SynchronousMachineModels():
             V_q = Re * I_q + Xep * I_d + self.Vs * np.cos(theta - self.theta_vs)
             V_t = np.sqrt(V_d ** 2 + V_q ** 2)  # equal to Vs
         return V_t
-        
+    
+    
     def odequations(self, t, x):
         """
         Calculates the derivatives of the state variables for the synchronous machine model.
@@ -148,6 +158,128 @@ class SynchronousMachineModels():
         Returns:
             list: A list of derivatives, different for each model type.
         """
+        
+        # Sauer-Pai model written separately
+        
+        if self.model_flag == "sauerpai1":
+            (delta, omega, e_q, e_d, psi__d, psi__q, vf, vinfty, Xline) = x
+    
+        if isinstance(delta, torch.Tensor):
+            # --- TORCH version (NN learning, back/fwd prop.) ---
+            vf_min = -4.0
+            vf_max = 4.0
+            vf_limited = torch.clamp(vf, min=vf_min, max=vf_max)
+    
+            thetaref = torch.tensor(0.0, device=vinfty.device, dtype=vinfty.dtype)
+            vx_inf = vinfty * torch.cos(thetaref)
+            vy_inf = vinfty * torch.sin(thetaref)
+    
+            gamma_d1 = (self.X__d - self.Xl)/(self.X_d - self.Xl)
+            gamma_q1 = (self.X__q - self.Xl)/(self.X_q - self.Xl)
+            gamma_d2 = (self.X_d - self.X__d)/((self.X_d - self.Xl)**2)
+            gamma_q2 = (self.X_q - self.X__q)/((self.X_q - self.Xl)**2)
+    
+            cos_d = torch.cos(delta)
+            sin_d = torch.sin(delta)
+    
+            batch_size = delta.shape[0] if delta.ndim > 0 else 1
+            A = torch.zeros((batch_size, 6, 6), device=delta.device)
+    
+            # Matrix A setup
+            A[:, 0, 0] = 1.0
+            A[:, 0, 2] = self.Ra
+            A[:, 0, 5] = 1.0
+            A[:, 1, 1] = 1.0
+            A[:, 1, 3] = self.Ra
+            A[:, 1, 4] = -1.0
+            A[:, 2, 2] = self.X__d
+            A[:, 2, 4] = 1.0
+            A[:, 3, 3] = self.X__q
+            A[:, 3, 5] = 1.0
+            A[:, 4, 0] = -sin_d.squeeze(-1)
+            A[:, 4, 1] = -cos_d.squeeze(-1)
+            A[:, 4, 2] = (Xline * cos_d).squeeze(-1)
+            A[:, 4, 3] = (-Xline * sin_d).squeeze(-1)
+            A[:, 5, 0] = cos_d.squeeze(-1)
+            A[:, 5, 1] = -sin_d.squeeze(-1)
+            A[:, 5, 2] = (Xline * sin_d).squeeze(-1)
+            A[:, 5, 3] = (Xline * cos_d).squeeze(-1)
+    
+            b = torch.zeros((batch_size, 6), device=delta.device)
+            b[:, 2] = (gamma_d1 * e_q + (1 - gamma_d1) * psi__d).squeeze(-1)
+            b[:, 3] = (-gamma_q1 * e_d + (1 - gamma_q1) * psi__q).squeeze(-1)
+            b[:, 4] = -vy_inf.squeeze(-1)
+            b[:, 5] = vx_inf.squeeze(-1)
+    
+            solution = torch.linalg.solve(A, b)
+            vd, vq, id, iq, psid, psiq = [solution[:, i:i+1] for i in range(6)]
+    
+            vt = torch.sqrt(vd ** 2 + vq ** 2)
+            Pe = vd * id + vq * iq
+    
+            ddeltadt = (omega - 1) * 2 * np.pi * 60
+            domegadt = (self.P_m - Pe - self.D * (omega - 1)) / (2 * self.H)
+            de_qdt = (-e_q - (self.Xd - self.X_d) * (-gamma_d2 * psi__d + gamma_d1 * id + gamma_d2 * e_q) + vf_limited) / self.T_d0
+            de_ddt = (-e_d + (self.Xq - self.X_q) * (-gamma_q2 * psi__q + gamma_q1 * iq - gamma_d2 * e_d)) / self.T_q0
+            dpsi__ddt = (-psi__d + e_q - (self.X_d - self.Xl) * id) / self.T__d0
+            dpsi__qdt = (-psi__q - e_d - (self.X_q - self.Xl) * iq) / self.T__q0
+            dvfdt = self.KA * (vinfty - vt)
+            dvinftydt = 0
+            dxlinedt = 0
+    
+        else:
+            # --- NUMPY version (dataset creation) ---
+            vf_min = -4.0
+            vf_max = 4.0
+            vf_limited = np.clip(vf, vf_min, vf_max)
+    
+            thetaref = 0.0
+            vx_inf = vinfty * np.cos(thetaref)
+            vy_inf = vinfty * np.sin(thetaref)
+    
+            gamma_d1 = (self.X__d - self.Xl)/(self.X_d - self.Xl)
+            gamma_q1 = (self.X__q - self.Xl)/(self.X_q - self.Xl)
+            gamma_d2 = (self.X_d - self.X__d)/((self.X_d - self.Xl)**2)
+            gamma_q2 = (self.X_q - self.X__q)/((self.X_q - self.Xl)**2)
+    
+            cos_d = np.cos(delta)
+            sin_d = np.sin(delta)
+    
+            A = np.array([
+                [1, 0, self.Ra, 0, 0, 1],
+                [0, 1, 0, self.Ra, -1, 0],
+                [0, 0, self.X__d, 0, 1, 0],
+                [0, 0, 0, self.X__q, 0, 1],
+                [-sin_d, -cos_d, Xline*cos_d, -Xline*sin_d, 0, 0],
+                [cos_d, -sin_d, Xline*sin_d, Xline*cos_d, 0, 0]
+            ])    
+            b = np.array([
+                0,
+                0,
+                gamma_d1 * e_q + (1 - gamma_d1) * psi__d,
+                -gamma_q1 * e_d + (1 - gamma_q1) * psi__q,
+                -vy_inf,
+                vx_inf
+            ])
+    
+            [vd, vq, id, iq, psid, psiq] = np.linalg.solve(A, b)
+            vt = np.hypot(vd, vq)
+            Pe = vd*id + vq*iq
+    
+            ddeltadt = (omega - 1) * 2 * np.pi * 60
+            domegadt = (self.P_m - Pe - self.D * (omega - 1)) / (2 * self.H)
+            de_qdt = (-e_q - (self.Xd - self.X_d) * (-gamma_d2 * psi__d + gamma_d1 * id + gamma_d2 * e_q) + vf_limited) / self.T_d0
+            de_ddt = (-e_d + (self.Xq - self.X_q) * (-gamma_q2 * psi__q + gamma_q1 * iq - gamma_d2 * e_d)) / self.T_q0
+            dpsi__ddt = (-psi__d + e_q - (self.X_d - self.Xl) * id) / self.T__d0
+            dpsi__qdt = (-psi__q - e_d - (self.X_q - self.Xl) * iq) / self.T__q0
+            dvfdt = self.KA * (vinfty - vt)
+            dvinftydt = 0
+            dxlinedt = 0
+
+        return [ddeltadt, domegadt, de_qdt, de_ddt, dpsi__ddt, dpsi__qdt, dvfdt, dvinftydt, dxlinedt]
+        
+        
+        
         if self.model_flag=="SM_IB" or self.model_flag=="SM4":
             theta, omega, E_d_dash, E_q_dash = x
         if self.model_flag == "SM6":
